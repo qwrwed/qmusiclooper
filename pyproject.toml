@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "qmusiclooper"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ffmpeg-python = "^0.2.0"
+pymusiclooper = {git = "https://github.com/qwrwed/PyMusicLooper.git", branch="dev"}
+mtools = {git = "https://github.com/qwrwed/mtools.git"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
