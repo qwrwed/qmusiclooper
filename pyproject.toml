@@ -1,18 +1,21 @@
-[tool.poetry]
+[project]
 name = "qmusiclooper"
-version = "0.1.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
-readme = "README.md"
-package-mode = false
-
-[tool.poetry.dependencies]
-python = "^3.11"
-ffmpeg-python = "^0.2.0"
-pymusiclooper = {git = "https://github.com/qwrwed/PyMusicLooper.git", branch="dev"}
-mtools = {git = "https://github.com/qwrwed/mtools.git"}
-
+version = "0.1.0"
+authors = [
+    { name = "qwrwed", email = "2429893+qwrwed@users.noreply.github.com" }
+]
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "ffmpeg-python (>=0.2.0,<0.3.0)",
+    "pymusiclooper @ git+https://github.com/qwrwed/PyMusicLooper.git@dev",
+    "mtools @ git+https://github.com/qwrwed/mtools.git"
+]
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core (>=2.0.0,<3.0.0)"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+skip_gitignore = true
+profile = "black"
