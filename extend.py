@@ -24,6 +24,7 @@ class ProgramArgsNamespace(Namespace):
     show_progress_bar: bool = False
     format: str = "M4A"
     interactive: bool = False
+    overwrite: bool = False
 
 
 def get_args() -> ProgramArgsNamespace:
@@ -39,6 +40,12 @@ def get_args() -> ProgramArgsNamespace:
         "--output-dir",
         type=Path,
         help="Default: <directory containing INPUT_FILE_PATH>",
+    )
+    parser.add_argument(
+        "-w",
+        "--overwrite",
+        action="store_true",
+        help="Overwrite output file if exists",
     )
     parser.add_argument(
         "-l",
@@ -144,6 +151,11 @@ def main(args: ProgramArgsNamespace) -> None:
             acodec="aac",
             map="0:a",
         )
+        if args.overwrite:
+            cmd = cmd.global_args("-y")
+        else:
+            cmd = cmd.global_args("-n")
+
         LOGGER.info(" ".join(str(c) for c in cmd.compile()))
         try:
             _stdout, _stderr = cmd.run()
