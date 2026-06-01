@@ -17,7 +17,8 @@ LOGGER = logging.getLogger(__name__)
 
 class ProgramArgsNamespace(Namespace):
     input_file_path: Path
-    extended_length: float
+    extended_length: float | None
+    loop_count: int | None
     output_dir: Path
     min_duration_multiplier: float = 0.35
     fade_length: float | None = None
@@ -49,12 +50,18 @@ def get_args() -> ProgramArgsNamespace:
         action="store_true",
         help="Overwrite output file if exists",
     )
-    parser.add_argument(
+    length_group = parser.add_mutually_exclusive_group(required=True)
+    length_group.add_argument(
         "-l",
         "--extended-length",
         type=float,
         help="Length (seconds) to extend to",
-        required=True,
+    )
+    length_group.add_argument(
+        "-n",
+        "--loop-count",
+        type=int,
+        help="Number of times to loop the track (or loop section) instead of specifying a duration",
     )
     parser.add_argument(
         "--min-duration-multiplier",
@@ -126,6 +133,26 @@ def get_args() -> ProgramArgsNamespace:
     return args
 
 
+def _loop_count_to_extended_length(
+    loop_count: int,
+    loop_start: int,
+    loop_end: int,
+    total_samples: int,
+    disable_fade_out: bool,
+    samples_to_seconds,
+) -> float:
+    intro_samples = loop_start
+    loop_samples = loop_end - loop_start
+    outro_samples = total_samples - loop_end
+    if disable_fade_out:
+        # extend() always writes int(loop_factor) loops + final_loop (= full loop),
+        # so pass loop_count-1 to get loop_count total plays
+        extended_samples = intro_samples + loop_samples * (loop_count - 1) + outro_samples
+    else:
+        extended_samples = intro_samples + loop_samples * loop_count
+    return samples_to_seconds(extended_samples)
+
+
 def main(args: ProgramArgsNamespace) -> None:
     input_path = args.input_file_path
     disable_fade_out = args.fade_length is None
@@ -134,12 +161,24 @@ def main(args: ProgramArgsNamespace) -> None:
         format_ = args.format
     else:
         format_ = "WAV"
+
     if args.simple_loop:
         looper = MusicLooper(filepath=str(input_path))
+        if args.loop_count is not None:
+            extended_length = _loop_count_to_extended_length(
+                loop_count=args.loop_count,
+                loop_start=0,
+                loop_end=looper.mlaudio.length,
+                total_samples=looper.mlaudio.length,
+                disable_fade_out=disable_fade_out,
+                samples_to_seconds=looper.mlaudio.samples_to_seconds,
+            )
+        else:
+            extended_length = args.extended_length
         raw_output_path = looper.extend(
             loop_start=0,
             loop_end=looper.mlaudio.length,
-            extended_length=args.extended_length,
+            extended_length=extended_length,
             fade_length=args.fade_length or 0,
             disable_fade_out=disable_fade_out,
             format=format_,
@@ -150,14 +189,28 @@ def main(args: ProgramArgsNamespace) -> None:
             path=str(input_path),
             output_dir=str(args.output_dir),
             min_duration_multiplier=args.min_duration_multiplier,
-            extended_length=args.extended_length,
+            extended_length=args.extended_length or 0,
             fade_length=args.fade_length or 0,
             disable_fade_out=disable_fade_out,
             batch_mode=not args.show_progress_bar,
             brute_force=args.brute_force,
             format=format_,
         )
-        raw_output_path = loop_export_handler.extend_track_runner()
+        if args.loop_count is not None:
+            loop_start, loop_end = loop_export_handler.get_loop_start_end()
+            extended_length = _loop_count_to_extended_length(
+                loop_count=args.loop_count,
+                loop_start=loop_start,
+                loop_end=loop_end,
+                total_samples=loop_export_handler.musiclooper.mlaudio.length,
+                disable_fade_out=disable_fade_out,
+                samples_to_seconds=loop_export_handler.musiclooper.mlaudio.samples_to_seconds,
+            )
+            loop_export_handler.extended_length = extended_length
+            raw_output_path = loop_export_handler.extend_track_runner(loop_start, loop_end)
+        else:
+            raw_output_path = loop_export_handler.extend_track_runner()
+
     if args.format == "M4A":
         LOGGER.info(f"Converting '{raw_output_path}' to M4A")
         output_path = raw_output_path.with_suffix("." + args.format.lower())
