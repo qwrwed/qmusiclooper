@@ -8,6 +8,7 @@ from typing import Literal
 import ffmpeg
 from mtools.metacopy import copy_metadata
 from mtools.utils import UnsupportedFormat
+from pymusiclooper.core import MusicLooper
 from pymusiclooper.handler import LoopExportHandler
 from utils_python import copy_filedate, get_platform, setup_root_logger
 
@@ -21,6 +22,7 @@ class ProgramArgsNamespace(Namespace):
     min_duration_multiplier: float = 0.35
     fade_length: float | None = None
     brute_force: bool = False
+    simple_loop: bool = False
     show_progress_bar: bool = False
     format: str = "M4A"
     interactive: bool = False
@@ -97,6 +99,11 @@ def get_args() -> ProgramArgsNamespace:
         "--interactive",
         action="store_true",
     )
+    parser.add_argument(
+        "--simple-loop",
+        action="store_true",
+        help="Skip loop point detection and loop the entire track from end back to start.",
+    )
 
     args = parser.parse_args(namespace=ProgramArgsNamespace())
 
@@ -127,18 +134,30 @@ def main(args: ProgramArgsNamespace) -> None:
         format_ = args.format
     else:
         format_ = "WAV"
-    loop_export_handler = LoopExportHandler(
-        path=str(input_path),
-        output_dir=str(args.output_dir),
-        min_duration_multiplier=args.min_duration_multiplier,
-        extended_length=args.extended_length,
-        fade_length=args.fade_length or 0,
-        disable_fade_out=disable_fade_out,
-        batch_mode=not args.show_progress_bar,
-        brute_force=args.brute_force,
-        format=format_,
-    )
-    raw_output_path = loop_export_handler.extend_track_runner()
+    if args.simple_loop:
+        looper = MusicLooper(filepath=str(input_path))
+        raw_output_path = looper.extend(
+            loop_start=0,
+            loop_end=looper.mlaudio.length,
+            extended_length=args.extended_length,
+            fade_length=args.fade_length or 0,
+            disable_fade_out=disable_fade_out,
+            format=format_,
+            output_dir=str(args.output_dir),
+        )
+    else:
+        loop_export_handler = LoopExportHandler(
+            path=str(input_path),
+            output_dir=str(args.output_dir),
+            min_duration_multiplier=args.min_duration_multiplier,
+            extended_length=args.extended_length,
+            fade_length=args.fade_length or 0,
+            disable_fade_out=disable_fade_out,
+            batch_mode=not args.show_progress_bar,
+            brute_force=args.brute_force,
+            format=format_,
+        )
+        raw_output_path = loop_export_handler.extend_track_runner()
     if args.format == "M4A":
         LOGGER.info(f"Converting '{raw_output_path}' to M4A")
         output_path = raw_output_path.with_suffix("." + args.format.lower())
